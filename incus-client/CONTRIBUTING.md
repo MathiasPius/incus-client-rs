@@ -24,7 +24,7 @@ the project is structured.
 └── incus-client-tests/         # Integration tests (not published on crates.io)
 ```
 
-Files listed in `incus-client/.openapi-ignore` are handwritten and must not be
+Files listed in `incus-client/.openapi-generator-ignore` are handwritten and must not be
 modified by the generator. Everything else inside `incus-client/` is generated.
 
 ---
@@ -48,92 +48,36 @@ This makes it straightforward to map a CLI command to the endpoint you need to a
 
 ### 1. Prerequisites
 
-You need Java (11+) to run OpenAPI Generator. The easiest way to install it:
+You only need Docker installed in order to update the definitions file and generate
+new library code using the `build.sh` script.
 
-```bash
-# Via Homebrew (macOS / Linux)
-brew install openapi-generator
+The script itself will pull images for running Python and the OpenAPI generator as
+necessary.
 
-# Or download the JAR directly (no install needed)
-curl -Lo openapi-generator-cli.jar \
-  https://repo1.maven.org/maven2/org/openapitools/openapi-generator-cli/7.6.0/openapi-generator-cli-7.6.0.jar
+#### 2. List available endpoints
 
-# Then run it with:
-java -jar openapi-generator-cli.jar <args>
-```
+`./build.sh list <TAG>` will list all available endpoints for the `<TAG>` version of Incus.
 
-You also need Python 3 with `ruamel.yaml` for the extraction script:
+**Example**  List all available endpoints in `v7.3.0`:
 
-```bash
-pip install ruamel.yaml
-```
+`./build.sh list v7.3.0`
 
-### 2. Download the upstream spec
+#### 3. Include additional endpoints
 
-```bash
-curl -Lo rest-api.yaml \
-  https://raw.githubusercontent.com/lxc/incus/refs/heads/main/doc/rest-api.yaml
-```
+`my-subset.yaml` only includes a subset of the complete Incus API for which code should be generated.
 
-### 3. Find the endpoint you want
+`./build.sh include <TAG> [ENDPOINTS...]` will expand `my-subset.yaml` to include any endpoints matching the provided `ENDPOINTS`.
 
-```bash
-python extract_openapi.py rest-api.yaml --list
-```
+**Example** Include the `networks` and `network-zones` endpoints:
 
-### 4. Extract it into the existing subset
+`./build.sh include v7.3.0 '/1.0/networks*' '/1.0/network-zones*'`
 
-The extraction script is additive — it merges the new paths into the existing file
-without touching what is already there:
+### 4. Generate the library files using `my-subset.yaml`.
 
-```bash
-# Example: add network endpoints
-python extract_openapi.py rest-api.yaml '/1.0/networks*' -o my-subset.yaml
+Update generated code based on `my-subset.yaml`
+`./build.sh build`
 
-# Add more endpoints in additional calls if needed
-python extract_openapi.py rest-api.yaml '/1.0/operations*' -o my-subset.yaml
-```
-
-The script automatically pulls in all `$ref` dependencies (schemas, parameters)
-transitively, so you do not need to worry about missing types.
-
-### 5. Regenerate the client
-
-Run the generator from the repository root:
-
-```bash
-openapi-generator generate \
-  -i my-subset.yaml \
-  -g rust \
-  -o incus-client/ \
-  --library reqwest \
-  --package-name incus-client \
-  --skip-validate-spec \
-  --ignore-file-override incus-client/.openapi-ignore \
-  --additional-properties=supportAsync=true
-```
-
-> `--skip-validate-spec` is required because the upstream Incus spec has minor
-> OpenAPI conformance issues (extra `example` fields, missing parameter declarations)
-> that do not affect the generated code.
-
-The `.openapi-ignore` file protects handwritten files from being overwritten:
-
-```
-Cargo.toml
-src/lib.rs
-src/unix_socket.rs
-```
-
-After generation, move the generated `README.md` to `README_API.md` and replace
-`README.md` with the one from the workspace root:
-
-```bash
-mv incus-client/README.md incus-client/README_API.md
-cp README.md incus-client/README.md
-```
-
-### 6. Verify
+### 5. Verify
 
 ```bash
 cargo test
@@ -146,7 +90,7 @@ cargo clippy
 Fix any compilation errors. The generator occasionally emits code that needs minor
 manual adjustments.
 
-### 7. Add a test
+### 6. Add a test
 
 Add an integration test in `incus-client-tests/` that covers the new endpoint.
 Tests require a running Incus daemon and are not run in CI by default:
@@ -156,7 +100,7 @@ cd incus-client-tests
 cargo test -- --nocapture
 ```
 
-### 8. Update the README
+### 7. Update the README
 
 Add your endpoint to the covered endpoints table in `incus-client/README.md`:
 
@@ -164,7 +108,7 @@ Add your endpoint to the covered endpoints table in `incus-client/README.md`:
 | `/1.0/networks` | `GET`, `POST` | Incus 6.7 |
 ```
 
-### 9. Open a PR
+### 8. Open a PR
 
 Submit your pull request with:
 - The regenerated files in `incus-client/`

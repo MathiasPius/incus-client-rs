@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+#
+# /// script
+# dependencies = ["ruamel.yaml"]
+# ///
 """
 extract_openapi.py — Extract selected paths from an OpenAPI YAML spec.
 
@@ -28,7 +32,6 @@ Examples:
 SPDX-License-Identifier: MIT OR Apache-2.0
 
 Copyright 2026 Johannes Leupolz <dev@leupolz.eu>
-
 """
 
 import argparse
